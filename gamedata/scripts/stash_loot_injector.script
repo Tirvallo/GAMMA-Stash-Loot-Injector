@@ -1,1 +1,70 @@
+-- Tirvallo's Stash Loot Injector: Injects custom items into GAMMA treasure pools with specified loot tiers
+-- v0.6: I Give Up Edition
 
+-- =======================================================================
+-- CONFIGURATION SECTION
+-- Format: ["item_section_name"] = tier_level (1 to 5)
+-- =======================================================================
+local my_custom_loot = {
+    ["your_custom_item"] = 1,
+}
+-- =======================================================================
+
+function on_game_start()
+    RegisterScriptCallback("on_game_load", inject_loot)
+end
+
+function inject_loot()
+    if not treasure_manager then
+        return 
+    end
+    
+    if treasure_manager.init_settings then
+        treasure_manager.init_settings()
+    end
+
+    local item_list = nil
+    
+    for func_name, func in pairs(treasure_manager) do
+        if type(func) == "function" then
+            local i = 1
+            while true do
+                local name, val = debug.getupvalue(func, i)
+                if not name then break end               
+                if name == "item_list" and type(val) == "table" then
+                    item_list = val
+                  --  printf("~ Loot Injector: SUCCESS! Found 'item_list' inside function [%s]", func_name)
+                    goto found_list 
+                end
+                i = i + 1
+            end
+        end
+    end
+
+    ::found_list::
+    
+    if item_list then
+        local count = 0
+        
+        for section, tier in pairs(my_custom_loot) do
+            if ini_sys:section_exist(section) then
+                
+                local kind = ini_sys:r_string_ex(section, "kind") or "i_misc"
+                
+                if not item_list[kind] then item_list[kind] = {} end
+                if not item_list[kind][tier] then item_list[kind][tier] = {} end
+
+                item_list[kind][tier][#item_list[kind][tier]+1] = section
+                count = count + 1
+              --  printf("~ Loot Injector: Injected [%s] to Pool [%s] Tier [%s]", section, kind, tier)
+            else
+              --  printf("! Loot Injector Error: Section [%s] does not exist in configs.", section)
+            end
+        end
+        
+      --  printf("~ Loot Injector: Complete. Injected %s new items.", count)
+
+    else
+		--  printf("! Loot Injector Critical Error: Could not find 'item_list'. Injection failed.")
+    end
+end
